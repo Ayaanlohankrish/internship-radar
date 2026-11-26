@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internship Radar</title>
+<style>
+:root{--bg:#f3f6fb;--surf:#fff;--ink:#12203a;--mut:#5d6b85;--line:#d9e1ee;--acc:#2f5bea;--ok:#12805c;--okb:#dff5ec;--wa:#a86100;--wab:#fdf0d4;--bad:#b3261e;--badb:#fde3e1}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1624;--surf:#172136;--ink:#e8eefb;--mut:#93a3c2;--line:#27344f;--acc:#7b9bff;--ok:#5fd6a6;--okb:#12342a;--wa:#f2b44d;--wab:#3a2c10;--bad:#ff8d85;--badb:#3d1a18}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;line-height:1.5}
+main{max-width:760px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:clamp(34px,8vw,56px);line-height:1;margin:0 0 10px;letter-spacing:-.03em;font-weight:800}
+h2{font-size:20px;margin:36px 0 12px}
+.sub{color:var(--mut);margin:0 0 24px;max-width:52ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+button,textarea{font:inherit;color:inherit}
+.chip{border:1px solid var(--line);background:var(--surf);padding:7px 14px;border-radius:99px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:6px 0 14px;color:var(--mut);font-size:14px;flex-wrap:wrap}
+label.tg{display:flex;gap:8px;align-items:center;cursor:pointer}
+.mode{font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--line)}
+.mode.live{background:var(--okb);color:var(--ok)}
+.card{background:var(--surf);border:1px solid var(--line);border-left-width:6px;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.card.ok{border-left-color:var(--ok)}.card.wa{border-left-color:var(--wa)}.card.bad{border-left-color:var(--bad)}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.top h3{margin:0;font-size:17px}
+.co{color:var(--mut);font-size:14px}
+.badge{padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700;white-space:nowrap}
+.ok .badge{background:var(--okb);color:var(--ok)}.wa .badge{background:var(--wab);color:var(--wa)}.bad .badge{background:var(--badb);color:var(--bad)}
+.tag{display:inline-block;background:var(--line);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700;margin-right:6px}
+.meta{font-size:14px;margin:8px 0 0}
+.desc{font-size:14px;color:var(--mut);margin:6px 0 0}
+details{margin-top:8px;font-size:14px}
+summary{cursor:pointer;color:var(--acc)}
+ul.fl{margin:8px 0 0;padding-left:18px}
+.good::marker{color:var(--ok)}.risk::marker{color:var(--bad)}
+a.view{display:inline-block;margin-top:10px;font-size:14px;color:var(--acc);font-weight:700}
+.checker{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:16px}
+textarea{width:100%;min-height:120px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical}
+.go{margin-top:10px;background:var(--acc);color:#fff;border:0;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:700}
+.try{background:none;border:0;color:var(--acc);cursor:pointer;text-decoration:underline;padding:10px 0 0 12px}
+#res .card{margin:14px 0 0}
+.msg{padding:16px;color:var(--mut)}
+.err{color:var(--bad)}
+.note{color:var(--mut);font-size:13px;margin-top:30px}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+<h1>Internship Radar</h1>
+<p class="sub">Pick your field. Every listing is scored for scam signals, and each score shows its reasons so you can judge for yourself.</p>
+
+<div class="chips" id="fields" role="group" aria-label="Field"></div>
+<div class="row"><span><span id="count"></span> <span class="mode" id="mode"></span></span>
+<label class="tg"><input type="checkbox" id="hide"> Hide risky listings</label></div>
+<div id="list"><p class="msg">Loading…</p></div>
+
+<h2>Check any listing yourself</h2>
+<div class="checker">
+<textarea id="txt" placeholder="Paste an internship message or posting here…"></textarea>
+<button class="go" id="run">Check for scam signals</button>
+<button class="try" id="demo">Try a sample scam</button>
+<div id="res"></div>
+</div>
+<p class="note">Risk signals, not a guarantee. Verify the company on its official website and never pay to apply. Jobs by Adzuna.</p>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let FIELDS=[], field="", rows=[], dropped=0;
+
+function card(o,withMeta=true){
+  const ul=(a,c)=>a.length?`<ul class="fl">${a.map(x=>`<li class="${c}">${esc(x)}</li>`).join("")}</ul>`:"";
+  return `<div class="card ${o.level}">
+  <div class="top"><div><h3>${esc(o.title||"Pasted listing")}</h3>${o.company?`<div class="co">${esc(o.company)}${o.location?" · "+esc(o.location):""}</div>`:""}</div>
+  <span class="badge">${esc(o.label)} · ${o.score}</span></div>
+  ${withMeta?`<p class="meta">${o.category&&o.category!=="Other"?`<span class="tag">${esc(o.category)}</span>`:""}${esc(o.salary)}</p><p class="desc">${esc(o.description)}…</p>`:""}
+  <details ${o.level!=="ok"?"open":""}><summary>Why this score</summary>
+  ${o.why.length?`<strong>Red flags</strong>${ul(o.why,"risk")}`:"<div>No red flags found.</div>"}
+  ${o.pos.length?`<strong>Good signs</strong>${ul(o.pos,"good")}`:""}</details>
+  ${withMeta&&o.url&&o.url!=="#"?`<a class="view" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">View original listing ↗</a>`:""}</div>`;
+}
+
+function draw(){
+  $("fields").innerHTML=FIELDS.map(f=>`<button class="chip" aria-pressed="${f===field}" data-f="${esc(f)}">${esc(f)}</button>`).join("");
+  const shown=$("hide").checked?rows.filter(r=>r.level!=="bad"):rows;
+  $("count").textContent=shown.length+" listing"+(shown.length===1?"":"s")+(dropped?` (${dropped} non-matching hidden)`:"");
+  $("list").innerHTML=shown.length?shown.map(r=>card(r)).join(""):'<p class="msg">Nothing to show for this field.</p>';
+}
+
+async function load(){
+  $("list").innerHTML='<p class="msg">Loading…</p>';
+  try{
+    const r=await fetch("/api/internships?field="+encodeURIComponent(field));
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||"Request failed");
+    rows=d.items; dropped=d.dropped||0;
+    $("mode").textContent=(d.mode==="live"?"LIVE":"SAMPLE DATA")+" · sorted by "+d.classifier;
+    $("mode").className="mode "+(d.mode==="live"?"live":"");
+    draw();
+  }catch(e){ $("list").innerHTML=`<p class="msg err">Couldn’t load listings: ${esc(e.message)}</p>`; }
+}
+
+$("fields").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(b){field=b.dataset.f;draw();load()}});
+$("hide").addEventListener("change",draw);
+
+async function check(){
+  const text=$("txt").value.trim();
+  if(!text){$("res").innerHTML="<p>Paste a listing first.</p>";return}
+  const r=await fetch("/api/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+  $("res").innerHTML=card(await r.json(),false);
+}
+$("run").addEventListener("click",check);
+$("demo").addEventListener("click",()=>{
+  $("txt").value="Hi! Urgent hiring for Data Entry Intern. Earn 55000 per month from home. No interview, instant selection. Pay 1500 registration fee (refundable) to confirm. Message us on WhatsApp now: hr.jobs2026@gmail.com. Limited seats!";
+  check();
+});
+
+(async()=>{ FIELDS=await (await fetch("/api/fields")).json(); field=FIELDS[0]; draw(); load(); })();
+</script>
+</body>
+</html>
